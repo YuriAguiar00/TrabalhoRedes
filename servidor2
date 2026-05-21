@@ -1,0 +1,186 @@
+import socket
+import threading
+
+HOST = "0.0.0.0"
+PORT = 4000
+
+clientes = [] #lista de clientes
+jogadas = {} #armazena jogadas pois agora temos um estado de espera, ou seja, armazenamos jogadas no servidor
+lock = threading.Lock()
+opcoes = ['pedra', 'papel', 'tesoura']
+
+def determinar_vencedor(j1, j2):
+
+    if j1 == j2:
+        return "empate"
+
+    elif (j1 == 'pedra' and j2 == 'tesoura') or \
+         (j1 == 'papel' and j2 == 'pedra') or \
+         (j1 == 'tesoura' and j2 == 'papel'):
+
+        return "jogador1"
+
+    else:
+        return "jogador2"
+
+# enviar mensagem padrão de teclado
+
+def enviar(cliente, mensagem):
+    cliente.sendall(mensagem.encode('utf-8'))
+# processo de cada cliente
+def gerenciar_cliente(cliente, numero_jogador):
+    global jogadas
+    try:
+        # estado de espera para 2 jogadores
+
+        if len(clientes) < 2:
+            enviar(cliente, "Esperando outro jogador...\n")
+
+        while len(clientes) < 2:
+            pass
+    # estado de jogo quando inicia, ou seja, temos dois clientes
+        enviar(cliente, "\nJogo iniciado!")
+        enviar(cliente, "\nEscolha: pedra, papel ou tesoura")
+        enviar(cliente, "\nDigite 'sair' para encerrar.\n")
+
+        # quando finalmente estou dentro do game, ou seja, o estado de jogo iniciado é verdade
+
+        while True:
+            data = cliente.recv(1024)
+            if not data:
+                break
+            jogada = data.decode('utf-8').lower()
+
+            # função para sair, avisa que alguem saiu e avisa pro outro que está só na "sala"
+
+            if jogada == "sair":
+
+                enviar(cliente, "Você saiu do jogo.")
+
+                for c in clientes:
+                    if c != cliente:
+                        enviar(c, "\nO outro jogador saiu.")
+                        enviar(c, "Partida encerrada.")
+                break
+            # invalidaçãod e jogadas
+            if jogada not in opcoes:
+                enviar(cliente, "Jogada inválida.")
+                continue
+            # salva sua jogada no servidor para comparar com a do oponente
+            with lock:
+                jogadas[numero_jogador] = jogada
+            enviar(cliente, "\nEsperando jogada do oponente...\n")
+            # quando eu tiver apenas uma jogada armazenada, eu continuo esperando meu oponnente
+
+            while len(jogadas) < 2:
+                pass
+            # usa as funções criadas para definir um vencedor, esperando, claro, utilziar o que está salvo
+
+            with lock:
+                if len(jogadas) == 2:
+                    j1 = jogadas[1]
+                    j2 = jogadas[2]
+                    vencedor = determinar_vencedor(j1, j2)
+                    
+#quando der empate
+                    if vencedor == "empate":
+
+                        msg1 = f"""
+====================
+RESULTADO DA RODADA
+====================
+
+Você jogou: {j1.upper()}
+Oponente jogou: {j2.upper()}
+
+EMPATE
+"""
+
+                        msg2 = msg1
+#quanfo primeiro cliente ganhar
+                    elif vencedor == "jogador1":
+                        msg1 = f"""
+====================
+RESULTADO DA RODADA
+====================
+
+Você jogou: {j1.upper()}
+Oponente jogou: {j2.upper()}
+
+VOCÊ VENCEU
+"""
+
+                        msg2 = f"""
+====================
+RESULTADO DA RODADA
+====================
+
+Você jogou: {j2.upper()}
+Oponente jogou: {j1.upper()}
+
+VOCÊ PERDEU
+"""
+#quando jogador 2 ganhar
+                    else:
+
+                        msg1 = f"""
+====================
+RESULTADO DA RODADA
+====================
+
+Você jogou: {j1.upper()}
+Oponente jogou: {j2.upper()}
+
+VOCÊ PERDEU
+"""
+
+                        msg2 = f"""
+====================
+RESULTADO DA RODADA
+====================
+
+Você jogou: {j2.upper()}
+Oponente jogou: {j1.upper()}
+
+VOCÊ VENCEU
+"""
+                    # envia as mensagens para cada um dos clientes
+                    enviar(clientes[0], msg1)
+                    enviar(clientes[1], msg2)
+                    # começa nova rodada
+                    jogadas = {}
+                    enviar(clientes[0], "\nNova rodada!")
+                    enviar(clientes[1], "\nNova rodada!")
+        #estado de excecção quando um jogador sai, ou seja, fica apenas um na sala
+    except:
+        print(f"Jogador {numero_jogador} desconectou.")
+        
+    finally:
+        cliente.close()
+        if cliente in clientes:
+            clientes.remove(cliente)
+
+
+# servidor e mensagens no pv4 e tcp
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as servidor:
+    servidor.bind((HOST, PORT))
+    #abre o servidor
+    servidor.listen()
+    print(f"\nServidor iniciado na porta {PORT}")
+    print("Aguardando jogadores...\n")
+    # espera a entrada dos clientes e mostra o ip, assim como a port autilziada por cada um
+    while len(clientes) < 2:
+        conn, addr = servidor.accept()
+        clientes.append(conn)
+        numero_jogador = len(clientes)
+        print(f"Jogador {numero_jogador} conectado: {addr}")
+
+        thread = threading.Thread(
+            target=gerenciar_cliente,
+            args=(conn, numero_jogador)
+        )
+
+        thread.start()
+        #confirma inicio de partida
+    print("\nDois jogadores conectados.")
+    print("Partida iniciada.\n")
