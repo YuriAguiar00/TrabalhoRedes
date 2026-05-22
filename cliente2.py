@@ -1,33 +1,15 @@
 import socket
 import threading
-
-# =========================
-# IP DO SERVIDOR
-# =========================
-
+# ip do roteador do yuri
 HOST = "10.149.148.55"
-
-# Se usar outro computador:
-# HOST = "192.168.X.X"
-
 PORT = 4000
-
-
-# =========================
-# RECEBER MENSAGENS
-# =========================
-
+# função de receber informações
 def receber_mensagens(cliente):
-
     while True:
-
         try:
-
             mensagem = cliente.recv(1024).decode('utf-8')
-
             if not mensagem:
                 break
-
             print(mensagem)
 
         except:
