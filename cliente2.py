@@ -1,58 +1,104 @@
 import socket
 import threading
-#ip de teste
-HOST = "127.0.0.1"
-# Porta do servidor
+
+# =========================
+# IP DO SERVIDOR
+# =========================
+
+HOST = "10.149.148.55"
+
+# Se usar outro computador:
+# HOST = "192.168.X.X"
+
 PORT = 4000
-# receber o que foi feito na tela (presta atenção aq gustavo)
-def receber_mensagens(socket_cliente):
+
+
+# =========================
+# RECEBER MENSAGENS
+# =========================
+
+def receber_mensagens(cliente):
+
     while True:
+
         try:
-            mensagem = socket_cliente.recv(1024).decode('utf-8')
+
+            mensagem = cliente.recv(1024).decode('utf-8')
+
             if not mensagem:
-                print("\nConexão encerrada pelo servidor.")
                 break
 
             print(mensagem)
 
         except:
-
-            print("\nErro na conexão.")
             break
-# cleinte 1 usando ipv4 e tcp
+
+
+# =========================
+# CLIENTE PRINCIPAL
+# =========================
+
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente:
+
     try:
-        # faz o three handshake e confrima conexão
+
         cliente.connect((HOST, PORT))
+
         print("Conectado ao servidor.")
 
-        # fila de concorrência para recebimentod e mnesagens
-        thread_recebimento = threading.Thread(
+        # =========================
+        # THREAD RECEBIMENTO
+        # =========================
+
+        thread = threading.Thread(
             target=receber_mensagens,
             args=(cliente,)
         )
-        thread_recebimento.daemon = True
-        thread_recebimento.start()
-        # quanto tudo tiver ok, executra o passo de while
-        while True:
-            jogada = input(">> ").lower()
 
-            # sair
+        thread.daemon = True
+        thread.start()
+
+        # =========================
+        # LOOP PRINCIPAL
+        # =========================
+
+        while True:
+
+            jogada = input(">> ").strip().lower()
+
+            # =========================
+            # SAIR
+            # =========================
+
             if jogada == "sair":
+
                 cliente.sendall(jogada.encode('utf-8'))
+
                 print("Você saiu do jogo.")
+
                 break
-            # valdia jogada
+
+            # =========================
+            # VALIDAÇÃO
+            # =========================
+
             if jogada not in ['pedra', 'papel', 'tesoura']:
+
                 print("Jogada inválida.")
                 print("Use: pedra, papel ou tesoura")
+
                 continue
 
-            # envia a jogada como caractere 
+            # =========================
+            # ENVIA AO SERVIDOR
+            # =========================
+
             cliente.sendall(jogada.encode('utf-8'))
-    #exceção caso servidor não esteja aberto
+
     except ConnectionRefusedError:
+
         print("Servidor não encontrado.")
-    #exceção caso erro de verdade na conexâo
+
     except:
+
         print("Erro na conexão.")
