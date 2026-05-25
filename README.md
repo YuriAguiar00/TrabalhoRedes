@@ -1,6 +1,6 @@
 # REDES DE COMPUTADORES I — TRABALHO DE SOCKETS
 
-Aplicação remota desenvolvida para a disciplina de **Redes de Computadores I** da Universidade Federal do Ceará (UFC), utilizando conceitos de programação com sockets, comunicação cliente-servidor e troca de mensagens entre dispositivos distintos.
+Aplicação remota desenvolvida para a disciplina de **Redes de Computadores I**, utilizando conceitos de programação com sockets, comunicação cliente-servidor e troca de mensagens entre dispositivos distintos.
 
 ## Sobre o Projeto
 
