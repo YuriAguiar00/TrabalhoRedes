@@ -1,113 +1,91 @@
-import socket  # Biblioteca responsável pela comunicação em rede
-import threading  # Permite múltiplas tarefas simultâneas
-
-HOST = "10.149.148.55"  # IP do servidor
-PORT = 4000  # Porta da aplicação
-
-# Lista que guarda os sockets dos jogadores (o 'conn' dos usuários).
-# Cada elemento é um socket TCP (conexão de rede).
-clientes = [] 
-jogadas = {}  # Armazena as jogadas da rodada atual
-
-# Lock impede que duas threads alterem dados ao mesmo tempo
+import socket # biblioteca responsável pela comunicação em rede
+import threading # permite múltiplas tarefas simultâneas
+HOST = "0.0.0.0" # IP do servidor
+PORT = 4000 # porta da aplicação qualquer entre 1 e 9999
+clientes = [] # lista que guarda os sockets dos jogadores o conn dos usuários cada elemento é um socket tco, conexão com redes
+jogadas = {} # armazena as jogadas da rodada atual
+# lock impede que duas threads alterem dados ao mesmo tempo
 lock = threading.Lock()
-
-# Barrier sincroniza os dois jogadores.
-# Só continua quando os dois chegarem nela (tratamento de erro de dessincronização).
+# barrier sincroniza os dois jogadores
+# só continua quando os dois chegarem nela (tratamento de erro de desicronização)
 barreira = threading.Barrier(2)
-
-# Jogadas válidas
+# jogadas válidas
 opcoes = ['pedra', 'papel', 'tesoura']
-
-# Função responsável por definir o vencedor
+# função responsável por definir vencedor
 def determinar_vencedor(j1, j2):
-    # Caso de empate
+    # caso empate
     if j1 == j2:
         return "empate"
-    # Regras de vitória do jogador 1
+    # regras de vitória do jogador 1
     elif (j1 == 'pedra' and j2 == 'tesoura') or \
          (j1 == 'papel' and j2 == 'pedra') or \
          (j1 == 'tesoura' and j2 == 'papel'):
         return "jogador1"
-    # Inverso: jogador 2 vence
+    # inverso, jogador 2 vence
     else:
         return "jogador2"
-
-# Função para enviar mensagens para os clientes
+# função para enviar mensagens para clientes
 def enviar(cliente, mensagem):
-    # encode() transforma string em bytes
-    # sendall() garante o envio completo dos dados
+    # encode transforma string em bytes
+    # sendall garante envio completo
     cliente.sendall(mensagem.encode('utf-8'))
-
-# Função principal de cada jogador.
-# Cada cliente conectado ganha uma thread exclusiva.
+ # função principal de cada jogador
+ # cada cliente conectado "ganha" uma thread
 def gerenciar_cliente(cliente, numero_jogador):
     global jogadas
     try:
-        # Se ainda não houver dois jogadores conectados
+        # se ainda não houver dois jogadores
         if len(clientes) < 2:
             enviar(cliente, "Esperando outro jogador...\n")
-        
-        # Espera (bloqueia o fluxo) até o segundo jogador entrar
+        # espera até o segundo jogador entrar
         while len(clientes) < 2:
             pass
-            
-        # Mensagens iniciais enviadas assim que o segundo jogador entra
+        # mensagens iniciais (quando segundo jogador entra, coonversa com o len de cima)
         enviar(cliente, "\nJogo iniciado!")
         enviar(cliente, "\nEscolha: pedra, papel ou tesoura")
         enviar(cliente, "\nDigite 'sair' para sair.\n")
-        
-        # Loop principal da partida
+        # loop principal da partida
         while True:
-            # Recebe dados do cliente de até 1024 bytes
+            # recebe dados do cliente de até 1024 bytes
             data = cliente.recv(1024)
-            
-            # Se o cliente desconectar (não houver dados recebidos)
+            # se cliente desconectar (não houver dado)
             if not data:
                 break
-                
-            # decode() transforma bytes em string
-            # strip() remove espaços extras e quebras de linha (\n)
-            # lower() transforma todo o texto em minúsculo
+            # decode transforma bytes em string
+            # strip remove espaços/quebras de linha
+            # lower transforma tudo em minúsculo
             jogada = data.decode('utf-8').strip().lower()
-            
-            # Comando para encerrar a conexão
+            # comando sair
             if jogada == "sair":
                 enviar(cliente, "Você saiu do jogo.")
-                # Avisa o outro jogador sobre a saída do oponente
+                # avisa outro jogador da saída
                 for c in clientes:
                     if c != cliente:
                         enviar(c, "\nO outro jogador saiu.")
-                        enviar(c, "Partida encerrada.")
                 break
-                
-            # Validação da jogada informada
+            # validação da jogada
             if jogada not in opcoes:
                 enviar(cliente, "Jogada inválida.")
                 continue
-                
-            # Lock protege o dicionário de jogadas, evitando Condição de Corrida (Race Condition)
+            # lock protege o dicionário jogada evitando race condition (tratamentod e erro)
             with lock:
-                # Salva a jogada utilizando o número de identificação do jogador
+                # salva jogada do jogador (no número do jogador na lista)
                 jogadas[numero_jogador] = jogada
-                
             enviar(cliente, "\nEsperando oponente...\n")
-            
-            # Primeira Barreira: espera os dois jogadores realizarem suas jogadas
+            # barrier:
+            # espera os dois jogadores jogarem
             barreira.wait()
-            
-            # Apenas o jogador 1 processa o resultado para evitar duplicação no envio
+            # apenas jogador 1 processa resultado para que não haja duplicação
             if numero_jogador == 1:
                 with lock:
-                    # Recupera as jogadas salvas no dicionário
+                    # pega jogadas salvas
                     j1 = jogadas[1]
                     j2 = jogadas[2]
-                    
-                    # Calcula o vencedor da rodada
+                    # calcula vencedor
                     vencedor = determinar_vencedor(j1, j2)
-                    
-                    # Caso de empate
+                    #caso de empate
                     if vencedor == "empate":
+
                         msg1 = f"""
 ====================
 RESULTADO
@@ -119,8 +97,7 @@ Oponente jogou: {j2.upper()}
 EMPATE
 """
                         msg2 = msg1
-                        
-                    # Caso o jogador 1 vença
+                    # jogador 1 venceu
                     elif vencedor == "jogador1":
                         msg1 = f"""
 ====================
@@ -132,6 +109,7 @@ Oponente jogou: {j2.upper()}
 
 VOCÊ VENCEU
 """
+
                         msg2 = f"""
 ====================
 RESULTADO
@@ -142,8 +120,9 @@ Oponente jogou: {j1.upper()}
 
 VOCÊ PERDEU
 """
-                    # Caso o jogador 2 vença
+                    # jogador 2 venceu
                     else:
+
                         msg1 = f"""
 ====================
 RESULTADO
@@ -165,60 +144,48 @@ Oponente jogou: {j1.upper()}
 VOCÊ VENCEU
 """
 
-                    # Envia o resultado estruturado para ambos os clientes
+                    # envia resultado para ambos
                     enviar(clientes[0], msg1)
                     enviar(clientes[1], msg2)
-                    
-                    # Limpa o dicionário para a próxima rodada
+                    # limpa jogadas da rodada
                     jogadas.clear()
-                    
-                    # Notifica o início de um novo turno
+                    # avisa inicio de nova rodada para ambos jogadores
                     enviar(clientes[0], "\nNova rodada!")
                     enviar(clientes[1], "\nNova rodada!")
-                    
-            # Segunda Barreira: garante que ambas as threads concluam a rodada atual
-            # antes de permitirem a leitura de novas jogadas no início do loop.
+            # segunda barrier, garante que ambas thread terminem antes da próxima rodada
             barreira.wait()
-            
-    # Caso ocorra alguma desconexão inesperada do cliente
+    # caso cliente desconecte
     except:
         print(f"Jogador {numero_jogador} desconectou.")
     finally:
-        # Garante o fechamento do socket do cliente
+        # fecha socket
         cliente.close()
-        # Remove o cliente da lista ativa do servidor
+        # remove cliente da lista
         if cliente in clientes:
             clientes.remove(cliente)
-
-# Instancia o socket principal utilizando IPv4 (AF_INET) e TCP (SOCK_STREAM)
+# cria socket TCP IPv4
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as servidor:
-    # bind() associa o IP e a porta configurados ao socket do servidor
+    # bind associa IP e porta ao socket
     servidor.bind((HOST, PORT))
-    
-    # Coloca o socket em modo de escuta passiva para conexões
+    # coloca socket em modo escuta (esses dois passos formam o three way handshake)
     servidor.listen()
     print(f"\nServidor iniciado na porta {PORT}")
     print("Aguardando jogadores...\n")
-    
-    # Aceita conexões até atingir o limite estipulado de dois jogadores
+    # aceita apenas dois jogadores
     while len(clientes) < 2:
-        # accept() bloqueia o fluxo e aceita a conexão TCP de entrada
+        # accept aceita conexão TCP
         conn, addr = servidor.accept()
-        
-        # Adiciona a conexão do cliente à lista
+        # salva cliente conectado
         clientes.append(conn)
-        
-        # Define o número de identificação do jogador com base no tamanho da lista
+        # define número do jogador
         numero_jogador = len(clientes)
-        print(f"Jogador {numero_jogador} conectado: {addr}")
-        
-        # Cria uma thread individual dedicada para gerenciar o respectivo cliente
+        print(f"Jogador {numero_jogador} conectado: {addr}") 
+        # cria thread individual para cliente
         thread = threading.Thread(
             target=gerenciar_cliente,
             args=(conn, numero_jogador)
         )
-        # Inicia a execução da thread em paralelo
+        # inicia thread
         thread.start()
-        
     print("\nDois jogadores conectados.")
     print("Partida iniciada.\n")
